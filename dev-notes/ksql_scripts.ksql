@@ -1,0 +1,17 @@
+CREATE TABLE security_tbl (rk STRING PRIMARY KEY, iss STRING, sub STRING, method STRING, url STRING, auth_app STRING, auth_granted BOOLEAN, auth_error STRING) WITH (KAFKA_TOPIC='security_activity', VALUE_FORMAT='avro');
+
+
+vvv dev testing vvv
+set 'auto.offset.reset' = 'earliest'
+
+vv assumes the JDBC source connector already created the topic vvv
+CREATE TABLE ACCT_TBL (acct_id INT PRIMARY KEY, name STRING, last_change_id BIGINT, last_modified BIGINT) WITH (KAFKA_TOPIC='replica_source_account', KEY_FORMAT='KAFKA', VALUE_FORMAT='AVRO');
+
+CREATE TABLE ACCT_TRG_TBL (acct_id INT PRIMARY KEY, targets ARRAY<VARCHAR>) WITH (PARTITIONS=1, KAFKA_TOPIC='replica_targets', KEY_FORMAT='KAFKA', VALUE_FORMAT='AVRO');
+INSERT INTO ACCT_TRG_TBL (acct_id, targets) VALUES (75, ARRAY['db1']);
+
+SELECT * FROM ACCT_TRG_TBL t INNER JOIN ACCT_TBL a ON a.acct_id = t.acct_id WHERE ARRAY_CONTAINS(t.targets, 'db1') EMIT CHANGES;
+SELECT a.ACCT_ID AS ACCT_ID, a.NAME AS NAME, a.LAST_MODIFIED AS LAST_MODIFIED FROM ACCT_TRG_TBL AS t INNER JOIN ACCT_TBL AS a ON a.acct_id = t.acct_id WHERE ARRAY_CONTAINS(t.targets, 'db1') EMIT CHANGES;
+
+CREATE TABLE ACCT_TBL_FOR_DB1 AS SELECT a.* FROM ACCT_TRG_TBL t INNER JOIN ACCT_TBL a ON a.acct_id = t.acct_id WHERE ARRAY_CONTAINS(t.targets, 'db1');
+CREATE TABLE replica_db1 AS SELECT a.ACCT_ID AS ACCT_ID, a.NAME AS NAME, a.LAST_MODIFIED AS LAST_MODIFIED FROM ACCT_TRG_TBL AS t INNER JOIN ACCT_TBL AS a ON a.acct_id = t.acct_id WHERE ARRAY_CONTAINS(t.targets, 'db1');

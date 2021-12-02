@@ -1,0 +1,11 @@
+[run]
+branch = True
+
+source =
+    .
+    #s4_django
+
+omit=
+    ./manage.py
+    replica_api/wsgi.py
+    replica_api/asgi.py
