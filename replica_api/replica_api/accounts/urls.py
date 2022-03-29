@@ -19,5 +19,5 @@ from .views import Accounts, Account
 
 urlpatterns = [
     path('', Accounts.as_view(), name='accounts'),
-    path('<int:id>', Account.as_view(), name='account')
+    path('<int:account_id>', Account.as_view(), name='account')
 ]

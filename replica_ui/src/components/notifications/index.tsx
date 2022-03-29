@@ -2,7 +2,7 @@ import React, { useState, useContext } from 'react';
 import { Toast, ToastContainer } from "react-bootstrap";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { IconProp } from '@fortawesome/fontawesome-svg-core'
-import { faCheckCircle, faTimesCircle } from '@fortawesome/free-solid-svg-icons'
+import { faCheckCircle, faExclamationCircle, faTimesCircle } from '@fortawesome/free-solid-svg-icons'
 import { Variant } from 'react-bootstrap/esm/types';
 
 // Context
@@ -37,13 +37,13 @@ export function Notifier(props: INotifierProps) {
         setNotifications([
             ...notifications,
             notification
-        ]);
+        ])
     }
 
     function removeNotification(idx: number) {
         setNotifications(notifications.filter((item, i) => {
             return i !== idx;
-        }));
+        }))
     }
 
     return (
@@ -81,28 +81,32 @@ export function Notification(props: INotification) {
 
 // Pre-configured Notification
 // # Success #####
-const DefaultSuccessNotification = {
-    icon: faCheckCircle,
-    color: 'success'
-}
-
 export function SuccessNotification(props: INotification) {
     return Notification(props)
 }
 
-SuccessNotification.defaultProps = DefaultSuccessNotification;
+SuccessNotification.defaultProps = {
+    icon: faCheckCircle,
+    color: 'success'
+}
 
 // # Danger ######
-const DefaultDangerNotification = {
+export function DangerNotification(props: INotification) {
+    return Notification(props)
+}
+DangerNotification.defaultProps = {
     icon: faTimesCircle,
     color: 'danger'
 }
 
-export function DangerNotification(props: INotification) {
+// # Warn ######
+export function WarnNotification(props: INotification) {
     return Notification(props)
 }
-
-DangerNotification.defaultProps = DefaultDangerNotification;
+WarnNotification.defaultProps = {
+    icon: faExclamationCircle,
+    color: 'warning'
+};
 
 // Notications
 function Notifications(props: INotifierContext) {
@@ -113,7 +117,7 @@ function Notifications(props: INotifierContext) {
     }
     
     return (
-        <ToastContainer position="top-end" className="p-3">
+        <ToastContainer className="p-3 fixed-top" style={{left:'unset'}}>
             {notifier.notifications.map((notification, idx) => {
                 return React.cloneElement(notification, {
                     key: idx,

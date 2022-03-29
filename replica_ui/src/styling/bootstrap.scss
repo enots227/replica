@@ -1,2 +1,6 @@
 @import "~bootstrap/scss/bootstrap";
 
+.form-control.readOnly {
+    background-color: $input-disabled-bg;
+    opacity: 1;
+}

@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Container, Card, Table, Button } from 'react-bootstrap'
-
-import { getAccount, getAccounts } from '../../services/api';
+import React, { useState, useEffect } from 'react'
+import useWebSocket, { ReadyState } from 'react-use-websocket'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Container, Card, Badge, Row, Col, Table, Button } from 'react-bootstrap'
+import { faCheckCircle } from '@fortawesome/free-solid-svg-icons'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { getAccount, getAccounts } from '../../services/api'
 import AccountPane from '../accounts/account'
 import { DangerNotification, INotifierContext, useNotifier } from '../../components/notifications';
 
@@ -25,14 +27,14 @@ type IAccountsPaneProps = {
 }
 
 function AccountsPane(props: IAccountsPaneProps) {
-    const navigate = useNavigate();
+    const navigate = useNavigate()
 
     function handleRowClick(acct_id: number) {
-        navigate(`/accounts/${acct_id}`);
+        navigate(`/accounts/${acct_id}`)
     }
 
     function handleNewClick() {
-        navigate(`/accounts/new`);
+        navigate(`/accounts/new`)
     }
 
     return (
@@ -133,12 +135,14 @@ function AccountsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [accountID]);
 
-    return (
-        <Container className="pt-4">
-            <AccountsPane accounts={accounts} setAccounts={setAccounts} selected={account?.id}/>
-            {account !== null ? <AccountPane account={account} setAccount={setAccount} afterSubmit={() => { loadAccounts() }} /> : null}
-        </Container>
-    );
+    return <Row className="m-2">
+        <Col>
+            <AccountsPane accounts={accounts} setAccounts={setAccounts} selected={account?.id} />
+        </Col>
+        <Col>
+            {account !== null ? <AccountPane account={account} setAccount={setAccount} reload={loadAccounts} /> : null}
+        </Col>
+    </Row>
 }
 
 export default AccountsPage;

@@ -1,341 +1,329 @@
-from typing import Tuple
-import requests
-import json
+from requests import Response
 from django.conf import settings
-from s4_django.log import S4Logger
-
-logger = S4Logger(__name__)
-
-
-def normalize_resp(resp) -> dict:
-    content = None
-
-    if hasattr(resp, 'text'):
-        try:
-            content = json.loads(resp.text)
-        except ValueError:
-            content = resp.text
-
-    return {
-        'resp.status_code': resp.status_code,
-        'resp.reason': resp.reason,
-        'resp.text': content,
-    }
+from kafka_cluster.kafka import Kafka
+from django.conf import settings
+from kafka_cluster.kafka import Kafka
 
 
-def exists_ktable(nrom_resp: dict) -> bool:
-    return nrom_resp['resp.status_code'] == 400 and \
-        isinstance(nrom_resp['resp.text'], dict) and \
-        'message' in nrom_resp['resp.text'] and \
-        'already exists' in nrom_resp['resp.text']['message']
+# Source ############################
+# Schema Registery
+async def create_src_schema() -> Response:
+    """Create the database source schema.
 
+    Returns:
+        Response from the Kafka Confluent Schema Registry API.
+    """
+    kafka: Kafka = settings.KAFKA
 
-def create_source_connector(
-    database_hostname: str,
-    database_port: int,
-    database_username: str,
-    database_password: str,
-    topic_prefix: str,
-    continuum_topic: str,
- ) -> Tuple[bool, dict]:
-    url = F'http://{settings.KAFKA_CONNECT}/connectors'
-    payload = {
-        'name': 'replica_source',
-        'config': {
-            'connector.class': 'io.confluent.connect.jdbc.JdbcSourceConnector',
-            'connection.url': F'jdbc:postgresql://{database_hostname}:{database_port}/source',
-            'connection.user': database_username,
-            'connection.password': database_password,
-            'topic.prefix': topic_prefix,
-            'poll.interval.ms' : 500, # 3600000,
-            'table.whitelist' : 'public.account',
-            'mode':'timestamp+incrementing',
-            'timestamp.column.name': 'last_modified',
-            'incrementing.column.name': 'acct_id',
-            'transforms':'createKey,extractInt',
-            'transforms.createKey.type':'org.apache.kafka.connect.transforms.ValueToKey',
-            'transforms.createKey.fields':'acct_id',
-            'transforms.extractInt.type':'org.apache.kafka.connect.transforms.ExtractField$Key',
-            'transforms.extractInt.field':'acct_id',
-            'key.converter': 'org.apache.kafka.connect.converters.IntegerConverter',
-            'value.converter': 'io.confluent.connect.avro.AvroConverter',
-            'value.converter.schema.registry.url': settings.KAFKA_SCHEMA_REGISTRY,
-            'continuum.topic': continuum_topic,
-            'continuum.bootstrap.servers': settings.KAFKA_BROKERS,
-            'continuum.schema.registry.url': settings.KAFKA_SCHEMA_REGISTRY,
-            'continuum.label': 'replica_source',
-        }
-    }
-
-    logger.info(3140, 'Kafka source connector creation request', log_data={
-        'url': url,
-        'payload': payload
+    return await kafka.schema_registry.create_schema('replica_src_account-value', {
+        'type': 'record',
+        'name': 'account',
+        'fields': [
+            {
+                'name': 'acct_id',
+                'type': 'int'
+            },
+            {
+                'name': 'name',
+                'type': [
+                    'null',
+                    'string'
+                ],
+                'default': None
+            },
+            {
+                'name': 'last_change_id',
+                'type': 'long'
+            },
+            {
+                'name': 'last_modified',
+                'type': {
+                    'type': 'long',
+                    'connect.version': 1,
+                    'connect.name': 'org.apache.kafka.connect.data.Timestamp',
+                    'logicalType': 'timestamp-millis'
+                }
+            }
+        ],
+        'connect.name': 'account',
     })
 
-    resp = requests.post(url, json = payload)
 
-    norm_resp = normalize_resp(resp)
-    success = False
+# KSQL Table
+async def create_src_ktable() -> Response:
+    """Create the database source KSQL table.
 
-    if resp.status_code == 201:
-        logger.info(3141, 'successfully created Kafka source connector', log_data=norm_resp)
-        success = True
-    elif resp.status_code == 409:
-        logger.info(3143, F'Kafka source connector already exists', log_data=norm_resp)
-        success = True
-    else:
-        logger.error(3142, 'failed to create Kafka source connector', log_data=norm_resp)
+    Returns:
+        Response from the KSQL API.
+    """
+    kafka: Kafka = settings.KAFKA
 
-    return success, norm_resp
+    # add NON NULL to columns once 
+    #   https://github.com/confluentinc/ksql/issues/4436
+    #   released and remove createSchema step
+
+    return await kafka.ksql.execute(
+        'CREATE TABLE "replica_src_account" ('
+            '"id" INT PRIMARY KEY,'
+            '"acct_id" INT,' # NON NULL
+            '"name" STRING,'
+            '"last_change_id" BIGINT,' # NON NULL
+            '"last_modified" TIMESTAMP' # NON NULL
+        ') WITH ('
+            'KAFKA_TOPIC=\'replica_src_account\','
+            'PARTITIONS=1,'
+            'KEY_FORMAT=\'KAFKA\','
+            'VALUE_FORMAT=\'AVRO\''
+        ');')
 
 
-def create_source_ktable(
-    topic_prefix: str,
- ) -> dict:
-    url = F'http://{settings.KSQL}/ksql'
-    payload = {
-        'ksql': 
-            'CREATE TABLE replica_acct_tbl (' \
-                'acct_id INT PRIMARY KEY,' \
-                'name STRING,' \
-                'last_change_id BIGINT,' \
-                'last_modified BIGINT' \
-            ') WITH (' \
-                F'KAFKA_TOPIC=\'{topic_prefix}account\',' \
-                'KEY_FORMAT=\'KAFKA\',' \
-                'VALUE_FORMAT=\'AVRO\'' \
-            ');',
-        'streamsProperties': {}
-    }
+async def delete_src_ktable() -> Response:
+    """Delete the database source KSQL table.
 
-    logger.info(3142, 'KSQL ktable replica_acct_tbl creation request', log_data={
-        'url': url,
-        'payload': payload
+    Returns:
+        Response from the KSQL API.
+    """
+    kafka: Kafka = settings.KAFKA
+
+    return await kafka.ksql.execute('DROP TABLE "replica_src_account";')
+
+
+# Connect
+async def create_src_connector(db_hostname: str, db_port: int, db_name: str, 
+    db_user: str, db_password: str, poll_interval: int) -> Response:
+    """Create the database source connector.
+
+    Args:
+        db_hostname: The source database hostname.
+        db_port: The source database port.
+        db_name: The source database name.
+        db_user: The source database username.
+        db_password: The source database password.
+        topic_prefix: The topic prefix to associate the source database table to.
+        poll_interval: The frequency of when the SQL server is queried for changes.
+
+    Returns:
+        Response from the Kafka connect API.
+    """
+    kafka: Kafka = settings.KAFKA
+
+    return await kafka.connector.create_connector('replica_src', {
+        'connector.class': 'io.confluent.connect.jdbc.JdbcSourceConnector',
+        'connection.url': F'jdbc:postgresql://{db_hostname}:{db_port}/{db_name}',
+        'connection.user': db_user,
+        'connection.password': db_password,
+        'topic.prefix': 'replica_src_',
+        'table.whitelist': 'public.account',
+        'mode': 'timestamp+incrementing',
+        'timestamp.column.name': 'last_modified',
+        'incrementing.column.name': 'acct_id',
+        'transforms': 'createKey,extractInt',
+        'transforms.createKey.type': 'org.apache.kafka.connect.transforms.ValueToKey',
+        'transforms.createKey.fields': 'acct_id',
+        'transforms.extractInt.type': 'org.apache.kafka.connect.transforms.ExtractField$Key',
+        'transforms.extractInt.field': 'acct_id',
+        'key.converter': 'org.apache.kafka.connect.converters.IntegerConverter',
+        'value.converter': 'io.confluent.connect.avro.AvroConverter',
+        'value.converter.schema.registry.url': kafka.schema_registry.url,
+        'continuum.topic': 'replica_status',
+        'continuum.bootstrap.servers': kafka.brokers,
+        'continuum.schema.registry.url': kafka.schema_registry.url,
+        'continuum.label': 'replica_src',
+        'poll.interval.ms': poll_interval,
     })
 
-    resp = requests.post(url, json = payload)
 
-    norm_resp = normalize_resp(resp)
-    success = False
+async def delete_src_connector() -> Response:
+    """Delete the database source connector.
 
-    if resp.status_code == 200:
-        logger.info(3143, 'successfully created ktable replica_acct_tbl', log_data=norm_resp)
-        success = True
-    elif exists_ktable(norm_resp):
-        logger.info(3143, F'ktable replica_acct_tbl already exists', log_data=norm_resp)
-        success = True
-    else:
-        logger.error(3144, 'failed to create ktable replica_acct_tbl', log_data=norm_resp)
-    
-    return success, norm_resp
+    Returns:
+        Response from the Kafka connect API.
+    """
+    kafka: Kafka = settings.KAFKA
+
+    return await kafka.connector.delete_connector('replica_src')
 
 
-def create_sink_ktable(
-    name: str,
-    db_id: int
- ) -> Tuple[bool, dict]:
-    url = F'http://{settings.KSQL}/ksql'
-    payload = {
-        'ksql': 
-            F'CREATE TABLE {name}_account AS SELECT ' \
-                'a.ACCT_ID AS KEY,' \
-                'AS_VALUE(a.ACCT_ID) AS "acct_id",' \
-                'a.NAME AS "name",' \
-                'a.LAST_CHANGE_ID AS "last_change_id",' \
-                'a.LAST_MODIFIED AS "last_modified" ' \
-            'FROM replica_trg_tbl AS t ' \
-            'INNER JOIN replica_acct_tbl AS a ON a.acct_id = t.acct_id ' \
-            'WHERE ' \
-                F'ARRAY_CONTAINS(t.targets, \'{db_id}\')' \
-            ';',
-        'streamsProperties': {}
-    }
+# Sink ##############################
+# KSQL Table
+async def create_snk_ktable(db_hostname: str, db_name: str, db_table: str) -> Response:
+    """Create the database sink KSQL table.
 
-    logger.info(3142, F'KSQL ktable {name}_account creation request', log_data={
-        'url': url,
-        'payload': payload
+    Args:
+        db_hostname: The sink database hostname.
+        db_name: The sink database name.
+        db_table: The sink database table.
+
+    Returns:
+        Response from the KSQL API.
+    """
+    kafka: Kafka = settings.KAFKA
+
+    return await kafka.ksql.execute(
+        F'CREATE TABLE "replica_snk_{db_hostname}_{db_name}_{db_table}" AS ' +
+        'SELECT ' +
+            'a."id" AS KEY,' +
+            'AS_VALUE(a."acct_id") AS "acct_id",' +
+            'a."name" AS "name",' +
+            'a."last_change_id" AS "last_change_id",' +
+            'a."last_modified" AS "last_modified" ' +
+        'FROM "replica_trg_tbl" AS t ' +
+        'INNER JOIN "replica_src_account" AS a ON a."id" = t."acct_id" ' +
+        'WHERE ' +
+            F'ARRAY_CONTAINS(t."targets", \'{db_hostname}/{db_name}\');')
+
+
+async def delete_snk_ktable(db_hostname: str, db_name: str, db_table: str) -> Response:
+    """Delete the database sink KSQL table.
+
+    Returns:
+        Response from the KSQL API.
+    """
+    kafka: Kafka = settings.KAFKA
+
+    return await kafka.ksql.execute(F'DROP TABLE "replica_snk_{db_hostname}_{db_name}_{db_table}";')
+
+
+# Connect
+async def create_snk_connector(db_hostname: str, db_port: int, db_name: str,
+    db_table: str, db_user: str, db_password: str) -> Response:
+    """Create the database sink connector.
+
+    Args:
+        db_hostname: The sink database hostname.
+        db_port: The sink database port.
+        db_name: The sink database name.
+        db_table: The sink database table.
+        db_user: The sink database username.
+        db_password: The sink database password.
+
+    Returns:
+        Response from the Kafka connect API.
+    """
+    kafka: Kafka = settings.KAFKA
+
+    return await kafka.connector.create_connector(
+        F'replica_snk_{db_hostname}_{db_name}_{db_table}', {
+        'connector.class': 'io.confluent.connect.jdbc.JdbcSinkConnector',
+        'topics': F'replica_snk_{db_hostname}_{db_name}_{db_table}',
+        'connection.url': F'jdbc:postgresql://{db_hostname}:{db_port}/{db_name}',
+        'connection.user': db_user,
+        'connection.password': db_password,
+        'key.converter': 'org.apache.kafka.connect.converters.IntegerConverter',
+        'value.converter': 'io.confluent.connect.avro.AvroConverter',
+        'value.converter.schemas.enabled': True,
+        'value.converter.schema.registry.url': kafka.schema_registry.url,
+        'tasks.max': '1',
+        'auto.create': True,
+        'auto.evolve': True,
+        'delete.enabled': True,
+        'insert.mode': 'upsert',
+        'pk.mode': 'record_key',
+        'pk.fields': 'acct_id',
+        'continuum.topic': 'replica_status',
+        'continuum.bootstrap.servers': kafka.brokers,
+        'continuum.schema.registry.url': kafka.schema_registry.url,
+        'continuum.label': F'{db_hostname}/{db_name}',
+        'table.name.format': db_table,
     })
 
-    resp = requests.post(url, json = payload)
 
-    norm_resp = normalize_resp(resp)
-    success = False
+async def delete_snk_connector(db_hostname: str, db_name: str, db_table: str) -> Response:
+    """Delete the database sink connector.
 
-    if resp.status_code == 200:
-        logger.info(3143, F'successfully created ktable {name}_account', log_data=norm_resp)
-        success = True
-    elif exists_ktable(norm_resp):
-        logger.info(3143, 'ktable {name}_account already exists', log_data=norm_resp)
-        success = True
-    else:
-        logger.error(3144, F'failed to create ktable {name}_account', log_data=norm_resp)
-    
-    return success, norm_resp
+    Args:
+        db_hostname: The sink database hostname.
+        db_name: The sink database name.
+        db_table: The sink database table.
 
+    Returns:
+        Response from the Kafka connect API.
+    """
+    kafka: Kafka = settings.KAFKA
 
-def create_sink_connector(
-    name: str,
-    database_hostname: str,
-    database_port: int,
-    database_name: str,
-    database_username: str,
-    database_password: str,
-    poll_interval: int,
-    continuum_topic: str,
- ) -> Tuple[bool, dict]:
-    url = F'http://{settings.KAFKA_CONNECT}/connectors'
-    payload = {
-        'name': name,
-        'config': {
-            'connector.class': 'io.confluent.connect.jdbc.JdbcSinkConnector',
-            'topics': F'{name.upper()}_ACCOUNT',
-            'connection.url': F"jdbc:postgresql://{database_hostname}:{database_port}/{database_name}",
-            'connection.user': database_username,
-            'connection.password': database_password,
-            'key.converter': 'org.apache.kafka.connect.converters.IntegerConverter',
-            'value.converter': 'io.confluent.connect.avro.AvroConverter',
-            'value.converter.schemas.enabled': True,
-            'value.converter.schema.registry.url': settings.KAFKA_SCHEMA_REGISTRY,
-            'tasks.max':'1',
-            'auto.create': True,
-            'auto.evolve': True,
-            'delete.enabled': True,
-            'insert.mode': 'upsert',
-            'pk.mode': 'record_key',
-            'pk.fields': 'acct_id',
-            'poll.interval.ms' : poll_interval,
-            'continuum.topic': continuum_topic,
-            'continuum.bootstrap.servers': settings.KAFKA_BROKERS,
-            'continuum.schema.registry.url': settings.KAFKA_SCHEMA_REGISTRY,
-            'continuum.label': F'{database_hostname}/{database_name}',
-            'table.name.format': 'account',
-        }
-    }
-
-    logger.info(3140, F'Kafka sink connector {name}_account creation request', log_data={
-        'url': url,
-        'payload': payload
-    })
-
-    resp = requests.post(url, json = payload)
-
-    norm_resp = normalize_resp(resp)
-    success = False
-    
-    if resp.status_code == 201:
-        logger.info(3141, F'successfully created Kafka sink connector {name}_account', log_data=norm_resp)
-        success = True
-    elif resp.status_code == 409:
-        logger.info(3143, F'Kafka sink connector {name}_account already exists', log_data=norm_resp)
-        success = True
-    else:
-        logger.error(3142, F'failed to create Kafka sink connector {name}_account', log_data=norm_resp)
-
-    return success, norm_resp
+    return await kafka.connector.delete_connector(
+        F'replica_snk_{db_hostname}_{db_name}_{db_table}')
 
 
-def create_target_ktable() -> Tuple[bool, dict]:
-    url = F'http://{settings.KSQL}/ksql'
-    payload = {
-        'ksql': 
-            F'CREATE TABLE replica_trg_tbl (' \
-                'acct_id INT PRIMARY KEY,' \
-                'targets ARRAY<VARCHAR>' \
-            ') WITH (' \
-                'PARTITIONS=1,' \
-                'KAFKA_TOPIC=\'replica_targets\',' \
-                'KEY_FORMAT=\'KAFKA\',' \
-                'VALUE_FORMAT=\'AVRO\'' \
-            ');',
-        'streamsProperties': {}
-    }
+# Database Target ###################
+# KSQL Table
+async def create_db_trg_ktable() -> Response:
+    """Create the database target KSQL table.
 
-    logger.info(3142, F'KSQL ktable replica_trg_tbl creation request', log_data={
-        'url': url,
-        'payload': payload
-    })
+    Returns:
+        Response from the KSQL API.
+    """
+    kafka: Kafka = settings.KAFKA
 
-    resp = requests.post(url, json = payload)
-
-    norm_resp = normalize_resp(resp)
-    success = False
-
-    if resp.status_code == 200:
-        logger.info(3143, F'successfully created ktable replica_trg_tbl', log_data=norm_resp)
-        success = True
-    elif exists_ktable(norm_resp):
-        logger.info(3143, F'ktable replica_trg_tbl already exists', log_data=norm_resp)
-        success = True
-    else:
-        logger.error(3144, F'failed to create ktable replica_trg_tbl', log_data=norm_resp)
-    
-    return success, norm_resp
+    return await kafka.ksql.execute(
+        'CREATE TABLE "replica_trg_tbl" (' +
+            '"acct_id" INT PRIMARY KEY,' +
+            '"targets" ARRAY<VARCHAR>' +
+        ') WITH (' +
+            'PARTITIONS=1,' +
+            'KAFKA_TOPIC=\'replica_trg\',' +
+            'KEY_FORMAT=\'KAFKA\',' +
+            'VALUE_FORMAT=\'AVRO\'' +
+        ');')
 
 
-def create_target(
-    acct_id: int,
-    targets: list
- ) -> Tuple[bool, dict]:
-    url = F'http://{settings.KSQL}/ksql'
+async def delete_db_trg_ktable() -> Response:
+    """Delete the database target KSQL table.
 
-    targets_str = "'" + "','".join(targets) + "'"
+    Returns:
+        Response from the KSQL API.
+    """
+    kafka: Kafka = settings.KAFKA
 
-    payload = {
-        'ksql': 
-            F'INSERT INTO replica_trg_tbl (' \
-                'acct_id,' \
-                'targets' \
-            ') VALUES (' \
-                F'{acct_id},' \
-                F'ARRAY[{targets_str}]' \
-            ');',
-        'streamsProperties': {}
-    }
-
-    logger.info(3142, F'KSQL insert into ktable replica_trg_tbl request', log_data={
-        'url': url,
-        'payload': payload
-    })
-
-    resp = requests.post(url, json = payload)
-
-    norm_resp = normalize_resp(resp)
-    success = False
-
-    if resp.status_code == 200:
-        logger.info(3143, F'successfully insert into ktable replica_trg_tbl', log_data=norm_resp)
-        success = True
-    else:
-        logger.error(3144, F'failed to insert into ktable replica_trg_tbl', log_data=norm_resp)
-    
-    return success, norm_resp
+    return await kafka.ksql.execute('DROP TABLE "replica_trg_tbl";')
 
 
-def create_target_ktable_querable() -> Tuple[bool, dict]:
-    url = F'http://{settings.KSQL}/ksql'
-    payload = {
-        'ksql': 'CREATE TABLE QUERYABLE_REPLICA_TRG_TBL AS SELECT * FROM REPLICA_TRG_TBL;',
-        'streamsProperties': {}
-    }
+async def create_db_trg_ktable_queryable() -> Response:
+    """Create the queryable database target KSQL table.
 
-    logger.info(3142, F'KSQL ktable QUERYABLE_REPLICA_TRG_TBL creation request', log_data={
-        'url': url,
-        'payload': payload
-    })
+    Returns:
+        Response from the KSQL API.
+    """
+    kafka: Kafka = settings.KAFKA
 
-    resp = requests.post(url, json = payload)
+    return await kafka.ksql.execute(
+        'CREATE TABLE "replica_trg_qtbl" AS SELECT * FROM "replica_trg_tbl";')
 
-    norm_resp = normalize_resp(resp)
-    success = False
 
-    if resp.status_code == 200:
-        logger.info(3143, F'successfully created ktable QUERYABLE_REPLICA_TRG_TBL', log_data=norm_resp)
-        success = True
-    elif exists_ktable(norm_resp):
-        logger.info(3143, F'ktable QUERYABLE_REPLICA_TRG_TBL already exists', log_data=norm_resp)
-        success = True
-    else:
-        logger.error(3144, F'failed to create ktable QUERYABLE_REPLICA_TRG_TBL', log_data=norm_resp)
-    
-    return success, norm_resp
+async def delete_db_trg_ktable_queryable() -> Response:
+    """Delete the queryable database target KSQL table.
+
+    Returns:
+        Response from the KSQL API.
+    """
+    kafka: Kafka = settings.KAFKA
+
+    return await kafka.ksql.execute('DROP TABLE "replica_trg_qtbl";')
+
+
+# Database Target Account ###########
+async def set_acct_trg(acct_id: int, targets: list) -> Response:
+    """Insert a database target record into the database target KSQL table.
+
+    Returns:
+        Response from the KSQL API.
+    """
+    kafka: Kafka = settings.KAFKA
+
+    if targets:
+        targets_str = "'" + "','".join(targets) + "'"
+
+        return await kafka.ksql.execute(
+            F'INSERT INTO "replica_trg_tbl" ('
+                '"acct_id","targets"'
+            ') VALUES ('
+                F'{acct_id},ARRAY[{targets_str}]'
+            ');')
+
+    return await kafka.ksql.execute(
+        F'INSERT INTO "replica_trg_tbl" ('
+            '"acct_id","targets"'
+        ') VALUES ('
+            F'{acct_id},NULL'
+        ');')
 

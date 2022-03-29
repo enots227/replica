@@ -1,15 +1,11 @@
 FROM python_st1
 
 # COPY SCRIPTS
-COPY ./replica_s4/replica_api/docker_files/build_env.sh   /opt/bin/build_env.sh
-COPY ./replica_s4/replica_api/docker_files/start_app.sh   /opt/bin/start_app.sh
-
-# Packages
-COPY ./django_s4                                          /tmp/django_s4
+COPY ./replica_st1/replica_api/docker_files/build_env.sh   /opt/bin/build_env.sh
+COPY ./replica_st1/replica_api/docker_files/start_app.sh   /opt/bin/start_app.sh
 
 # Package Install List
-COPY ./replica_s4/replica_api/requirements.txt            /tmp/requirements.txt
-COPY ./replica_s4/replica_api/requirements_custom.txt     /tmp/requirements_custom.txt
+COPY ./replica_st1/replica_api/requirements.txt            /tmp/requirements.txt
 
 # FIX: CONVERT SCRIPTS FROM DOS TO UNIX
 RUN apt-get update

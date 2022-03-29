@@ -11,12 +11,15 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 """
 
 import os
+from logging import Logger
 from pathlib import Path
 import socket
 from django.utils.translation import gettext_lazy as _
-from s4_django.log import S4Logger
+from kafka_cluster.kafka import Kafka, KafkaConnector, KafkaKSQL, KafkaSchemaRegistry
 
-logger = S4Logger(__name__)
+
+logger = Logger(__name__)
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -49,9 +52,9 @@ INSTALLED_APPS = [
     'django_guid',
     'rest_framework',
     'corsheaders',
-    's4_django',
-    's4_django.middleware',
-    's4_django.database',
+    # 's4_django',
+    # 's4_django.middleware',
+    # 's4_django.database',
     'accounts',
     'kafka_cluster',
 ]
@@ -69,7 +72,7 @@ MIDDLEWARE = [
     # extras
     'django_guid.middleware.guid_middleware',
     # custom middlewares
-    's4_django.middleware.errors.JsonErrorMiddleware',
+    # 's4_django.middleware.errors.JsonErrorMiddleware',
 ]
 
 ROOT_URLCONF = 'replica_api.urls'
@@ -162,6 +165,12 @@ KAFKA_SCHEMA_REGISTRY = 'http://schema-registry:8081'
 KAFKA_CLIENT_ID = socket.gethostname()
 KAFKA_CONNECT = os.environ.get("KAFKA_CONNECT")
 KSQL = os.environ.get("KSQL")
+KAFKA = Kafka(
+    brokers = KAFKA_BROKERS,
+    connector = KafkaConnector(url='http://' + KAFKA_CONNECT),
+    ksql = KafkaKSQL(url='http://' + KSQL),
+    schema_registry = KafkaSchemaRegistry(url=KAFKA_SCHEMA_REGISTRY),
+)
 
 # Translations
 LANGUAGES = [
@@ -192,48 +201,52 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{asctime} {levelname} {correlation_id} {name}.{funcName}:{lineno} {process:d} {thread:d}\n'
-                      '{msgid}{message}{json_data}',
+            # 'format': '{asctime} {levelname} {correlation_id} {name}.{funcName}:{lineno} {process:d} {thread:d}\n'
+            #           '{msgid}{message}{json_data}',
+            'format': '{asctime} {levelname} {name}.{funcName}:{lineno} {process:d} {thread:d}\n'
+                      '{message}',
             'style': '{',
         },
         'console_debugging': {
-            'format': '{asctime} {levelname} {correlation_id} - {name}.{funcName}:{lineno}\n'
-                      '{msgid}{message}{json_data}',
+            # 'format': '{asctime} {levelname} {correlation_id} - {name}.{funcName}:{lineno}\n'
+            #           '{msgid}{message}{json_data}',
+            'format': '{asctime} {levelname}  - {name}.{funcName}:{lineno}\n'
+                      '{message}',
             'style': '{',
             'datefmt': '%H:%M:%S',
         }
     },
     'filters': {
-        'request_id': {
-            '()': 'django_guid.log_filters.CorrelationId'
-        },
-        'msgid': {
-            '()': 's4_django.log.MessageId'
-        },
-        'jsonify': {
-            '()': 's4_django.log.JsonData'
-        },
+        # 'request_id': {
+        #     '()': 'django_guid.log_filters.CorrelationId'
+        # },
+        # 'msgid': {
+        #     '()': 's4_django.log.MessageId'
+        # },
+        # 'jsonify': {
+        #     '()': 's4_django.log.JsonData'
+        # },
     },
     'handlers': {
         'console': {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
             'formatter': 'console_debugging',
-            'filters': ['request_id', 'msgid', 'jsonify'],
+            # 'filters': ['request_id', 'msgid', 'jsonify'],
         },
         'file': {
             'level': 'DEBUG',
             'class': 'logging.FileHandler',
             'filename': F'{APP_DIR}/logs/replica_api.log',
             'formatter': 'verbose',
-            'filters': ['request_id', 'msgid', 'jsonify'],
+            # 'filters': ['request_id', 'msgid', 'jsonify'],
         },
-        'mail_admins': {
-            'level': 'ERROR',
-            'class': 'django.utils.log.AdminEmailHandler',
-            'formatter': 'verbose',
-            'filters': ['request_id', 'msgid', 'jsonify'],
-        },
+        # 'mail_admins': {
+        #     'level': 'ERROR',
+        #     'class': 'django.utils.log.AdminEmailHandler',
+        #     'formatter': 'verbose',
+        #     # 'filters': ['request_id', 'msgid', 'jsonify'],
+        # },
     },
     'loggers': {
         '': {

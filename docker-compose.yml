@@ -205,7 +205,7 @@ services:
     hostname: replica_api
     build:
       context: ../
-      dockerfile: ./replica_s4/replica_api/Dockerfile
+      dockerfile: ./replica_st1/replica_api/Dockerfile
     ports:
       - "8000:8000"
     volumes:
@@ -221,7 +221,7 @@ services:
     hostname: replica_broadcast
     build:
       context: ../
-      dockerfile: ./replica_s4/replica_broadcast/Dockerfile
+      dockerfile: ./replica_st1/replica_broadcast/Dockerfile
     ports:
       - "8001:8000"
     volumes:

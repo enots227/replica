@@ -15,11 +15,33 @@ Including another URL conf
 """
 # from django.contrib import admin
 from django.urls import path
-from .views import KafkaSetupSource, KafkaSetupSink, KafkaSetupTarget, KafkaAcctTarget
+from . import views
+from .views import KafkaAcctTarget
 
 urlpatterns = [
-    path('target/setup', KafkaSetupTarget.as_view(), name='kafka-target'),
-    path('target', KafkaAcctTarget.as_view(), name='kafka-target-acct'),
-    path('source/setup', KafkaSetupSource.as_view(), name='kafka-source'),
-    path('sink/setup', KafkaSetupSink.as_view(), name='kafka-sink'),
+    # All
+    path('connectors', views.KafkaConnectors.as_view(),
+        name='connectors'),
+
+    # Source
+    path('schema-registry/src', views.KafkaSourceSchemaRegistry.as_view(),
+        name='src-schema'),
+    path('ktables/src', views.KafkaSourceKTable.as_view(),
+        name='src-ktable'),
+    path('connectors/src', views.KafkaSourceConnector.as_view(),
+        name='src-connector'),
+
+    # Sink
+    path('ktables/snk', views.KafkaSinkKTable.as_view(),
+        name='snk-ktable'),
+    path('connectors/snk', views.KafkaSinkConnector.as_view(),
+        name='snk-connector'),
+
+    # Database Target
+    path('ktables/db-trg', views.KafkaDBTargetKTable.as_view(),
+        name='db-trg-ktable'),
+    path('ktables/db-trg-qry', views.KafkaDBTargetKTableQueryable.as_view(),
+        name='db-trg-ktable'),
+
+    path('acct-db-trg', KafkaAcctTarget.as_view(), name='acct-db-trg'),
 ]

@@ -1,3 +1,4 @@
+"""Handles the business logic for accounts."""
 import requests
 import json
 from django.utils.timezone import now
@@ -5,11 +6,13 @@ from django.db import models, transaction
 from asgiref.sync import sync_to_async
 from django.db.models.query import QuerySet
 from django.conf import settings
-from s4_django.log import S4Logger
+from logging import Logger
 
-logger = S4Logger(__name__)
+logger = Logger(__name__)
+
 
 class AccountChange(models.Model):
+    """A database table containing entries tracking account record changes."""
 
     class Meta:
         db_table = "account_change"
@@ -19,6 +22,7 @@ class AccountChange(models.Model):
 
 
 class Account(models.Model):
+    """A database table containing account information."""
 
     class Meta:
         db_table = "account"
@@ -32,10 +36,18 @@ class Account(models.Model):
 @sync_to_async
 @transaction.atomic
 def create_account(name: str = "") -> Account:
-    account_change = AccountChange( account_id=None )
+    """Create a new account.
+
+    Args:
+        name: An example property for an account.
+
+    Returns:
+        The account record newly created.
+    """
+    account_change = AccountChange(account_id=None)
     account_change.save()
 
-    account = Account( name=name, last_change_id=account_change.change_id )
+    account = Account(name=name, last_change_id=account_change.change_id)
     account.save()
 
     account_change.account_id = account.id
@@ -43,22 +55,45 @@ def create_account(name: str = "") -> Account:
 
     return account
 
+
 def list_accounts_sync() -> QuerySet:
+    """List all accounts."""
     return Account.objects.all()
+
 
 list_accounts = sync_to_async(list_accounts_sync)
 
-def get_account_sync(id: int) -> QuerySet:
-    return Account.objects.get(id = id)
+
+def get_account_sync(account_id: int) -> QuerySet:
+    """Get a single account.
+
+    Args:
+        account_id: The account ID.
+
+    Returns:
+        An account record.
+    """
+    return Account.objects.get(id=account_id)
+
 
 get_account = sync_to_async(get_account_sync)
 
+
 @sync_to_async
-def update_account(id: int, **account_data: str) -> Account:
-    account_change = AccountChange( account_id=id )
+def update_account(account_id: int, **account_data: dict) -> Account:
+    """Update a single account.
+
+    Args:
+        account_id: The account ID to update.
+        account_data: One or more properties to update.
+
+    Returns:
+        An account record.
+    """
+    account_change = AccountChange(account_id=account_id)
     account_change.save()
 
-    account = Account.objects.get( id=id )
+    account = Account.objects.get(id=account_id)
     account.last_change_id = account_change.change_id
     account.last_modified = now()
 
@@ -70,37 +105,28 @@ def update_account(id: int, **account_data: str) -> Account:
     return account
 
 
-def get_account_targets(id: int) -> list:
-    url = F'http://{settings.KSQL}/query'
-    payload = {
-        'ksql': F'SELECT TARGETS FROM QUERYABLE_REPLICA_TRG_TBL WHERE ACCT_ID = {id};',
-        'streamsProperties': {}
-    }
+async def get_account_targets(account_id: int) -> list:
+    """Get database targets from the queryable KSQL table.
 
-    logger.info(3142, F'KSQL select QUERYABLE_REPLICA_TRG_TBL request', log_data={
-        'url': url,
-        'payload': payload
-    })
+    Args:
+        account_id: The account ID.
 
-    resp = requests.post(url, json = payload)
+    Returns:
+        The database targets for the account.
+    """
+    kafka: Kafka = settings.KAFKA
 
-    if resp.status_code == 200:
-        rows = json.loads(resp.text)
-
-        logger.info(3143, F'successfully select ktable QUERYABLE_REPLICA_TRG_TBL', log_data={
-            'resp.status_code': resp.status_code,
-            'resp.reason': resp.reason,
-            'resp.text': rows,
-        })
+    resp = await kafka.ksql.query(
+        F'SELECT "targets" FROM "replica_trg_qtbl" WHERE "acct_id"={account_id};')
         
+    if resp.status_code == 200:
+        rows = json.loads(resp.content)
+
         # skip header row and selecting one record only
         if len(rows) > 1:
-            return rows[1]['row']['columns'][0]
-    else:
-        logger.error(3144, F'failed to select ktable QUERYABLE_REPLICA_TRG_TBL', log_data={
-            'resp.status_code': resp.status_code,
-            'resp.reason': resp.reason,
-            'resp.text': resp.text,
-        })
+            targets = rows[1]['row']['columns'][0]
+
+            if targets:
+                return targets
     
     return []

@@ -148,48 +148,52 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{asctime} {levelname} {correlation_id} {name}.{funcName}:{lineno} {process:d} {thread:d}\n'
-                      '{msgid}{message}{json_data}',
+            # 'format': '{asctime} {levelname} {correlation_id} {name}.{funcName}:{lineno} {process:d} {thread:d}\n'
+            #           '{msgid}{message}{json_data}',
+            'format': '{asctime} {levelname} {name}.{funcName}:{lineno} {process:d} {thread:d}\n'
+                      '{message}',
             'style': '{',
         },
         'console_debugging': {
-            'format': '{asctime} {levelname} {correlation_id} - {name}.{funcName}:{lineno}\n'
-                      '{msgid}{message}{json_data}',
+            # 'format': '{asctime} {levelname} {correlation_id} - {name}.{funcName}:{lineno}\n'
+            #           '{msgid}{message}{json_data}',
+            'format': '{asctime} {levelname}  - {name}.{funcName}:{lineno}\n'
+                      '{message}',
             'style': '{',
             'datefmt': '%H:%M:%S',
         }
     },
     'filters': {
-        'request_id': {
-            '()': 'django_guid.log_filters.CorrelationId'
-        },
-        'msgid': {
-            '()': 's4_django.log.MessageId'
-        },
-        'jsonify': {
-            '()': 's4_django.log.JsonData'
-        },
+        # 'request_id': {
+        #     '()': 'django_guid.log_filters.CorrelationId'
+        # },
+        # 'msgid': {
+        #     '()': 's4_django.log.MessageId'
+        # },
+        # 'jsonify': {
+        #     '()': 's4_django.log.JsonData'
+        # },
     },
     'handlers': {
         'console': {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
             'formatter': 'console_debugging',
-            'filters': ['request_id', 'msgid', 'jsonify'],
+            # 'filters': ['request_id', 'msgid', 'jsonify'],
         },
         'file': {
             'level': 'DEBUG',
             'class': 'logging.FileHandler',
             'filename': F'{APP_DIR}/logs/replica_broadcast.log',
             'formatter': 'verbose',
-            'filters': ['request_id', 'msgid', 'jsonify'],
+            # 'filters': ['request_id', 'msgid', 'jsonify'],
         },
-        'mail_admins': {
-            'level': 'ERROR',
-            'class': 'django.utils.log.AdminEmailHandler',
-            'formatter': 'verbose',
-            'filters': ['request_id', 'msgid', 'jsonify'],
-        },
+        # 'mail_admins': {
+        #     'level': 'ERROR',
+        #     'class': 'django.utils.log.AdminEmailHandler',
+        #     'formatter': 'verbose',
+        #     # 'filters': ['request_id', 'msgid', 'jsonify'],
+        # },
     },
     'loggers': {
         '': {
