@@ -1,0 +1,14 @@
+{
+    "name": "Replica UI",
+    // The order of the files is important since later files override previous ones
+    "dockerComposeFile": [
+        "docker-compose.dev.yml"
+    ],
+    "service": "replica_ui",
+    "workspaceFolder": "/usr/src/app",
+    "shutdownAction": "stopCompose",
+    "extensions": [
+        "ckolkman.vscode-postgres",
+        "rmoff.ksql",
+    ],
+}

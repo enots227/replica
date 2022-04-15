@@ -25,6 +25,9 @@ export default function RawErrorResponse(props: Props) {
                 content = content.replaceAll(/(?:id|class)="[\w_-\s]+"/g, '')
 
                 break
+            default:
+                content = props.axiosError.toString()
+                break
         }
     }
 

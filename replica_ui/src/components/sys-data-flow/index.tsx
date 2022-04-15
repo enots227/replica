@@ -316,7 +316,7 @@ export default function Diagram(props: Props) {
 
             chart += applyStyles(chart_id, nodeSelected, props)
         }
-
+        
         return chart
     }
 

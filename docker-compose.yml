@@ -203,32 +203,57 @@ services:
 
   replica_api:
     hostname: replica_api
-    build:
-      context: ../
-      dockerfile: ./replica_st1/replica_api/Dockerfile
+    build: ./replica_api
     ports:
-      - "8000:8000"
+      - "8000:80"
     volumes:
-      - ./replica_api:/opt/app
+      - ./replica_api/src:/usr/src/app
+      - ./replica_api/logs:/usr/src/logs
     environment:
-      env: development
-      SOURCE_TOPIC_PREFIX: replica_source_
-      CONTINUUM_TOPIC: replica_status
-      KAFKA_CONNECT: "connect:8083"
-      KSQL: "ksqldb-server:8088"
+      SECRET_KEY: AYMhWZTrfRcLrIFcCbsRe8E9dgy@llC*n4YGd%Gsz5gdcSE4DShnTQM2msYUMv
+      ALLOWED_HOSTS: localhost
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+
+      DB_USERNAME: db_user
+      DB_PASSWORD: db_password
+      DB_HOST: postgres1
+      DB_PORT: 5432
+      DB_NAME: source
+
+      KAFKA_BOOTSTRAP_SERVERS: broker1:29092,broker2:29093
+      CONNECT_URL: http://connect:8083
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      KSQL_URL: http://ksqldb-server:8088
   
   replica_broadcast:
     hostname: replica_broadcast
-    build:
-      context: ../
-      dockerfile: ./replica_st1/replica_broadcast/Dockerfile
+    build: ./replica_broadcast
     ports:
-      - "8001:8000"
+      - "8001:80"
     volumes:
-      - ./replica_broadcast:/opt/app
+      - ./replica_broadcast/src:/usr/src/app
+      - ./replica_broadcast/logs:/usr/src/logs
     environment:
-      env: development
+      SECRET_KEY: M5be!fHQ1eaxDbNqS$$!TsS%Hp5BiqJv4s5K9AcN2E@y6n6hvDN^QTf%7%$$iqb#
+      ALLOWED_HOSTS: localhost
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+
+      KAFKA_BOOTSTRAP_SERVERS: broker1:29092,broker2:29093
+      CONNECT_URL: http://connect:8083
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      KSQL_URL: http://ksqldb-server:8088
+
+  replica_ui:
+    hostname: replica_ui
+    build: ./replica_ui
+    ports:
+      - "8002:80"
+    volumes:
+      - ./replica_ui:/usr/src/app
+    environment:
+      NODE_ENV: production
+      PORT: 80
 
 networks:
   default:
-    name: kafka-cdc
+    name: replica

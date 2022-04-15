@@ -1,6 +1,6 @@
 import { ConnectionString } from 'connection-string'
 import { useState } from 'react'
-import { Accordion, Table, Button } from 'react-bootstrap'
+import { Accordion, Table, Button, useAccordionButton } from 'react-bootstrap'
 import { useNavigate, useParams } from 'react-router-dom'
 import { connectorToDiagramStatus } from '../../../components/kafka'
 import { KafkaConnectorInfoStatus } from '../../../components/kafka/types'
@@ -11,10 +11,10 @@ import SinkPane from './sink'
 
 function parseData(data: KafkaConnectorInfoStatus) {
     const url = new ConnectionString(data.info.config['connection.url']);
-    
+
     let res: Sink = {
         dbHostname: typeof (url.hostname) !== "undefined" ? url.hostname : '',
-        dbPort: typeof(url.port) !== "undefined" ? url.port : 5432,
+        dbPort: typeof (url.port) !== "undefined" ? url.port : 5432,
         dbName: typeof (url.path) !== "undefined" ? url.path.join('/') : '',
         dbTable: data.info.config['table.name.format'],
         dbUser: data.info.config['connection.user'],
@@ -46,13 +46,22 @@ export default function SinksPane(props: Props) {
         setActiveKey('1')
     }
 
-    function handleAccordionClick(key: string | null) {
-        if ( key !== null )
-            setActiveKey(key)
+    function AccordionHeaderButton({ children, eventKey }: { children: JSX.Element, eventKey: string }) {
+        const decoratedOnClick = useAccordionButton(eventKey, () => {
+            if ( eventKey !== null )
+                setActiveKey(eventKey)
+        });
+
+        return (
+            <Accordion.Button onClick={decoratedOnClick}>
+                {children}
+            </Accordion.Button>
+        );
     }
 
+
     let selected: Sink | null = null
-    
+
     if (nodeID === 'new') {
         selected = {
             dbHostname: 'postgres2',
@@ -64,19 +73,19 @@ export default function SinksPane(props: Props) {
             status_topic: 'replica_status',
             status: STATUSES.UNKNOWN,
         } as Sink
-    } else if ( typeof(nodeID) !== 'undefined' ) {
+    } else if (typeof (nodeID) !== 'undefined') {
         const search = props.items.find((node) => {
             return node.id === nodeID
         }) ?? null
 
-        if ( search !== null )
+        if (search !== null)
             selected = parseData(search.data)
     }
 
     return (
-        <Accordion className="sticky-top" activeKey={activeKey} onSelect={handleAccordionClick}>
+        <Accordion className="sticky-top" activeKey={activeKey}>
             <Accordion.Item eventKey="0">
-                <Accordion.Header><h6 className="mb-0">Sinks</h6></Accordion.Header>
+                <AccordionHeaderButton eventKey="0"><h6 className="mb-0">Sinks</h6></AccordionHeaderButton>
                 <Accordion.Body>
                     <div className="d-grid gap-2 d-md-flex justify-content-md-end">
                         <Button onClick={handleNewClick}>Add Sink</Button>
@@ -126,7 +135,7 @@ export default function SinksPane(props: Props) {
                     </Table>
                 </Accordion.Body>
             </Accordion.Item>
-            {selected !== null ? <SinkPane nodeIDs={props.items.map((node) => node.id)} item={selected} reload={props.reload} /> : null}
+            {selected !== null ? <SinkPane nodeIDs={props.items.map((node) => node.id)} item={selected} reload={props.reload} accordionHeaderButton={AccordionHeaderButton} /> : null}
         </Accordion>
     );
 }

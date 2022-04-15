@@ -15,7 +15,8 @@ import { useEffect } from 'react'
 type Props = {
     nodeIDs: string[]
     item: Sink
-    reload: () => Promise<void>
+    reload: () => Promise<void>,
+    accordionHeaderButton: ({ children, eventKey }: { children: JSX.Element, eventKey: string }) => JSX.Element,
 }
 
 export default function SinkPane(props: Props) {
@@ -247,9 +248,11 @@ export default function SinkPane(props: Props) {
 
     return (
         <Accordion.Item eventKey="1">
-            <Accordion.Header>
-                {isNew ? "Create" : "Edit"} Sink Connector
-            </Accordion.Header>
+            <props.accordionHeaderButton eventKey="1">
+                <h6>
+                    {isNew ? "Create" : "Edit"} Sink Connector
+                </h6>
+            </props.accordionHeaderButton>
             <Accordion.Body>
                 <Form>
                     <Row>

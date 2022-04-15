@@ -88,19 +88,19 @@ function Page() {
         <Container fluid className="pt-2">
             <Diagram chartTemplate={`
                 flowchart
-                    RUI[Replica\\n<small>UI</small>]
-                    RAPI(Replica\\n<small>API</small>)
-                    RB[Replica Broadcast\\n<small>Web Socket API</small>]
-                    KT_STAT(Replica Status\\n<small>Kafka Topic</small>)
+                    RUI[Replica\\nUI]
+                    RAPI(Replica\\nAPI)
+                    RB[Replica Broadcast\\nWeb Socket API]
+                    KT_STAT(Replica Status\\nKafka Topic)
                     DB_SRC[(DB)]
-                    KC_SRC{{Source\\n<small>Kafka Connector</small>}}
-                    KT_ACCT(Accounts\\n<small>Kafka Topic</small>)
-                    KTBL_ACCT(Accounts\\n<small>KSQL Table</small>)
-                    KT_TRG(Account Target Databses\\n<small>Kafka Topic</small>)
-                    KTBL_TRG(Account Target Databases\\n<small>KSQL Table</small>)
-                    KTBL_SNK($nodeLabel\\nDB Accounts\\n<small>KSQL Table</small>)
-                    KT_SNK($nodeLabel\\nDB Accounts\\n<small>Kafka Topic</small>)
-                    KC_SNK{{$nodeLabel\\nSink DB\\n<small>Kafka Connector</small>}}
+                    KC_SRC{{Source\\nKafka Connector}}
+                    KT_ACCT(Accounts\\nKafka Topic)
+                    KTBL_ACCT(Accounts\\nKSQL Table)
+                    KT_TRG(Account Target Databses\\nKafka Topic)
+                    KTBL_TRG(Account Target Databases\\nKSQL Table)
+                    KTBL_SNK($nodeLabel\\nDB Accounts\\nKSQL Table)
+                    KT_SNK($nodeLabel\\nDB Accounts\\nKafka Topic)
+                    KC_SNK{{$nodeLabel\\nSink DB\\nKafka Connector}}
                     DB_SNK[($nodeLabel\\nDB)]
 
                     style KT_ACCT fill:#9370DB,color: #fff

@@ -79,8 +79,8 @@ export default function AccountPane(props: Props) {
     }, [props.account.targets])
 
     useEffect(() => {
+        console.log(lastMessage)
         if (lastMessage === null || lastProcessedTimestamp === lastMessage.timeStamp) return;
-
         if (lastJsonMessage.target === "replica_src") {
             setDBTargetsStatus(convertTargetsWithStatus(props.account.targets, false))
         } else {

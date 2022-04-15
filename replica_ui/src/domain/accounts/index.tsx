@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import useWebSocket, { ReadyState } from 'react-use-websocket'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Container, Card, Badge, Row, Col, Table, Button } from 'react-bootstrap'
-import { faCheckCircle } from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { Card, Row, Col, Table, Button } from 'react-bootstrap'
 import { getAccount, getAccounts } from '../../services/api'
 import AccountPane from '../accounts/account'
 import { DangerNotification, INotifierContext, useNotifier } from '../../components/notifications';
