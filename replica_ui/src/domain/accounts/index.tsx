@@ -8,6 +8,10 @@ import { DangerNotification, INotifierContext, useNotifier } from '../../compone
 export type IAccount = {
     id: number
     name: string
+    lastChange: {
+        id: number
+        on: Date | null
+    }
     targets: string[]
 }
 
@@ -69,7 +73,7 @@ function AccountsPane(props: IAccountsPaneProps) {
     );
 }
 
-async function fetchAccount(notifier: INotifierContext, id: string | undefined) {
+async function fetchAccount(notifier: INotifierContext, id: string | undefined): Promise<IAccount | null> {
     if (typeof id === "undefined") {
         return null
     }
@@ -78,6 +82,10 @@ async function fetchAccount(notifier: INotifierContext, id: string | undefined) 
         return {
             id: 0,
             name: "",
+            lastChange: {
+                id: 0,
+                on: null,
+            },
             targets: []
         }
     }
@@ -96,6 +104,10 @@ async function fetchAccount(notifier: INotifierContext, id: string | undefined) 
     return {
         id: result.data.account.id,
         name: result.data.account.name,
+        lastChange: {
+            id: result.data.account.lastChange.id,
+            on: new Date(result.data.account.lastChange.on),
+        },
         targets: result.data.targets,
     }
 }

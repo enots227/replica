@@ -57,6 +57,7 @@ export async function runConnector(func: () => Promise<AxiosResponse>) {
 export function connectorToDiagramStatus(data: KafkaConnectorInfoStatus) {
     switch (data.status.connector.state) {
         case "RUNNING": return STATUSES.OPERATIONAL
+        case "PAUSED":  return STATUSES.PAUSED
         default:        return STATUSES.UNKNOWN
     }
 }

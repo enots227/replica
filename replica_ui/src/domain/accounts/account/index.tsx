@@ -1,4 +1,4 @@
-import { faEye, faPencilAlt, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faDatabase, faEye, faPencilAlt, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import React, { Fragment, useEffect, useState } from 'react'
 import useWebSocket, { ReadyState } from 'react-use-websocket'
@@ -21,13 +21,14 @@ async function setAccount(notifier: INotifierContext, account: IAccount | null) 
         notifier.pushNotification(
             <SuccessNotification title={"Successfully " + (isNew ? "Created" : "Updated") + " Account"}>The account {account.id} was successfully {isNew ? "created" : "updated"}.</SuccessNotification>
         );
+
+        return result.data
     } else {
         notifier.pushNotification(
             <DangerNotification title={"Failed to " + (isNew ? "Create" : "Update") + " Account"}>Unexpected error occurred.</DangerNotification>
         );
+        return null
     }
-
-    console.log(result);
 }
 // Pane
 export type AccountDBTargetStatus = {
@@ -79,12 +80,12 @@ export default function AccountPane(props: Props) {
     }, [props.account.targets])
 
     useEffect(() => {
-        console.log(lastMessage)
         if (lastMessage === null || lastProcessedTimestamp === lastMessage.timeStamp) return;
-        if (lastJsonMessage.target === "replica_src") {
+
+        if (lastJsonMessage.label === "replica_src") {
             setDBTargetsStatus(convertTargetsWithStatus(props.account.targets, false))
         } else {
-            const idx = dbTargetsStatus.findIndex((target) => { return target.targetName === lastJsonMessage.target })
+            const idx = dbTargetsStatus.findIndex((target) => { return target.targetName === lastJsonMessage.label })
 
             let targets = [...dbTargetsStatus];
 
@@ -92,7 +93,7 @@ export default function AccountPane(props: Props) {
                 targets[idx].complete = true;
             } else {
                 targets.push({
-                    targetName: lastJsonMessage.target,
+                    targetName: lastJsonMessage.label,
                     complete: true,
                 })
 
@@ -137,7 +138,16 @@ export default function AccountPane(props: Props) {
         e.preventDefault();
 
         (async () => {
-            await setAccount(notifier, props.account)
+            const data = await setAccount(notifier, props.account)
+
+            props.setAccount({
+                ...props.account,
+                lastChange: {
+                    id: data.change.id,
+                    on: new Date(data.change.on),
+                }
+            })
+
             props.reload()
         })()
     }
@@ -182,7 +192,7 @@ export default function AccountPane(props: Props) {
 
         saveDBTargets(targets)
     }
-
+    
     return <Card>
         <Card.Header>
             <h6 className="mb-0">
@@ -199,6 +209,7 @@ export default function AccountPane(props: Props) {
                                 <tr>
                                     <th>Database Target</th>
                                     <th>Status</th>
+                                    <th>Version</th>
                                     <th></th>
                                 </tr>
                             </thead>
@@ -214,9 +225,12 @@ export default function AccountPane(props: Props) {
                                                 </span>
                                                 :
                                                 <span>
-                                                    <div style={{maxHeight: "16px", maxWidth: "16px"}} className="spinner-border me-2" role="status"></div>
+                                                    <div style={{ maxHeight: "16px", maxWidth: "16px" }} className="spinner-border me-2" role="status"></div>
                                                     Synchronizing...
                                                 </span>}
+                                        </td>
+                                        <td>
+                                            {null}
                                         </td>
                                         <td className='d-grid d-md-flex justify-content-md-end'>
                                             <Button variant='danger' size='sm' onClick={(e) => handleDBTargetDelete(dbTarget.targetName)}  >
@@ -236,39 +250,62 @@ export default function AccountPane(props: Props) {
                         </InputGroup>
                     </Form>
                     :
-                    <Fragment>{dbTargetsStatus?.map((target, t) => {
-                        if (target.complete) {
-                            return <Card className={'text-success' + (dbTargetsStatus.length === t + 1 ? ' me-auto' : '')}>
-                                <Card.Body>
-                                    <Row>
-                                        <Col className="m-auto text-center" style={{ "minHeight": "36px" }}>
-                                            <FontAwesomeIcon icon={faCheckCircle} size="2x" />
-                                        </Col>
-                                        <Col>
-                                            <h6>{target.targetName}</h6>
-                                            <small className="text-muted">Synchronized</small>
-                                        </Col>
-                                    </Row>
-                                </Card.Body>
-                            </Card>
-                        } else {
-                            return <Card>
-                                <Card.Body>
-                                    <Row>
-                                        <Col className="mx-auto my-auto text-center" style={{ "minHeight": "36px" }}>
-                                            <div className="spinner-border " role="status"></div>
-                                        </Col>
-                                        <Col>
-                                            <h6>{target.targetName}</h6>
-                                            <small className="text-muted">Synchronizing...</small >
-                                        </Col>
-                                    </Row>
-                                </Card.Body>
-                            </Card>
-                        }
-                    })}</Fragment>
+                    <Fragment>
+                        <Card className='text-primary'>
+                            <Card.Body>
+                                <Row>
+                                    <Col className="m-auto text-center" style={{ "minHeight": "36px" }}>
+                                        <FontAwesomeIcon icon={faDatabase} size="2x" />
+                                    </Col>
+                                    <Col style={{minWidth: '11em'}}>
+                                        <h6 className='m-0'>Last Changed</h6>
+                                        <small className="text-muted">{props.account.lastChange.on?.toLocaleDateString('en-US', {
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: '2-digit',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                        })}</small>
+                                        <div className="mt-2">v{props.account.lastChange.id}</div>
+                                    </Col>
+                                </Row>
+                            </Card.Body>
+                        </Card>
+                        {dbTargetsStatus?.map((target, t) => {
+                            if (target.complete) {
+                                return <Card className='text-success' key={t}>
+                                    <Card.Body>
+                                        <Row>
+                                            <Col className="m-auto text-center" style={{ "minHeight": "36px" }}>
+                                                <FontAwesomeIcon icon={faCheckCircle} size="2x" />
+                                            </Col>
+                                            <Col>
+                                                <h6 className='m-0'>{target.targetName}</h6>
+                                                <small className="text-muted">Synchronized</small>
+                                                <div className="mt-2">v{null}</div>
+                                            </Col>
+                                        </Row>
+                                    </Card.Body>
+                                </Card>
+                            } else {
+                                return <Card key={t}>
+                                    <Card.Body>
+                                        <Row>
+                                            <Col className="mx-auto my-auto text-center" style={{ "minHeight": "36px" }}>
+                                                <div className="spinner-border " role="status"></div>
+                                            </Col>
+                                            <Col>
+                                                <h6 className='m-0'>{target.targetName}</h6>
+                                                <small className="text-muted">Synchronizing...</small>
+                                                <div className="mt-2">v{null}</div>
+                                            </Col>
+                                        </Row>
+                                    </Card.Body>
+                                </Card>
+                            }
+                        })}</Fragment>
                 }
-                <div>
+                <div className='ms-auto'>
                     <Button variant='link' size='sm' onClick={handleDBTargetToggle} title={dbTargetToggle ? 'View Mode' : 'Edit Mode'}>
                         <FontAwesomeIcon icon={dbTargetToggle ? faEye : faPencilAlt} />
                     </Button>

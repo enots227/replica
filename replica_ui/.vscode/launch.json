@@ -8,7 +8,6 @@
             "name": "Launch",
             "request": "launch",
             "runtimeArgs": [
-                "run-script",
                 "start"
             ],
             "runtimeExecutable": "npm",

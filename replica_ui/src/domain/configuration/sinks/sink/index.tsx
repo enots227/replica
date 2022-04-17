@@ -2,14 +2,14 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Form, Button, Accordion, ButtonGroup, Col, Row, Dropdown, DropdownButton, Spinner } from 'react-bootstrap'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faPause, faPlay, faPlus, faTrash, faRotate } from '@fortawesome/free-solid-svg-icons'
 import axios, { AxiosError } from 'axios'
 import RawErrorResponse from '../../../../components/debug/rawErrorResponse'
 import { useNotifier, SuccessNotification, DangerNotification, WarnNotification } from '../../../../components/notifications'
 import { AlreadyExistsError, AlreadyNotExistsError } from '../../../../components/kafka/errors'
 import { parseIntSafe } from '../../../../services/utils/parser'
 import { Sink } from '../types'
-import { createSinkKTable, deleteSinkKTable, createSinkConnector, deleteSinkConnector } from '../../../../services/api'
+import { createSinkKTable, deleteSinkKTable, createSinkConnector, deleteSinkConnector, pauseSinkConnector, resumeSinkConnector, restartSinkConnector } from '../../../../services/api'
 import { useEffect } from 'react'
 
 type Props = {
@@ -240,6 +240,66 @@ export default function SinkPane(props: Props) {
         })()
     }
 
+    function handlePauseConnector() {
+        (async () => {
+            try {
+                setProcessing(true)
+                setErrResp(null)
+
+                await pauseSinkConnector(item.dbHostname, item.dbName, item.dbTable)
+
+                notifier.pushNotification(<SuccessNotification title='Successfully Paused Connector'>The sink connector was paused.</SuccessNotification>)
+            } catch (err) {
+                notifier.pushNotification(<DangerNotification title='Failure Pausing Connector'>Unexpected error occurred while attempting to pause the sink connector.</DangerNotification>)
+
+                if (axios.isAxiosError(err))
+                    setErrResp(err)
+            } finally {
+                setProcessing(false)
+            }
+        })()
+    }
+
+    function handleResumeConnector() {
+        (async () => {
+            try {
+                setProcessing(true)
+                setErrResp(null)
+
+                await resumeSinkConnector(item.dbHostname, item.dbName, item.dbTable)
+
+                notifier.pushNotification(<SuccessNotification title='Successfully Resumed Connector'>The sink connector was resumed.</SuccessNotification>)
+            } catch (err) {
+                notifier.pushNotification(<DangerNotification title='Failure Resuming Connector'>Unexpected error occurred while attempting to resume the sink connector.</DangerNotification>)
+
+                if (axios.isAxiosError(err))
+                    setErrResp(err)
+            } finally {
+                setProcessing(false)
+            }
+        })()
+    }
+
+    function handleRestartConnector() {
+        (async () => {
+            try {
+                setProcessing(true)
+                setErrResp(null)
+
+                await restartSinkConnector(item.dbHostname, item.dbName, item.dbTable)
+
+                notifier.pushNotification(<SuccessNotification title='Successfully Restarted Connector'>The sink connector was restarted.</SuccessNotification>)
+            } catch (err) {
+                notifier.pushNotification(<DangerNotification title='Failure Restarting Connector'>Unexpected error occurred while attempting to restart the sink connector.</DangerNotification>)
+
+                if (axios.isAxiosError(err))
+                    setErrResp(err)
+            } finally {
+                setProcessing(false)
+            }
+        })()
+    }
+
     useEffect(() => {
         setItem(props.item)
     }, [props.item, setItem])
@@ -315,27 +375,39 @@ export default function SinkPane(props: Props) {
                                         <FontAwesomeIcon icon={faPlus} className="pe-1" />
                                         Create
                                     </Dropdown.Item>
-                                    <Dropdown.Item eventKey="1" onClick={handleDelete}>
+                                    <Dropdown.Item eventKey="2" onClick={handleDelete}>
                                         <FontAwesomeIcon icon={faTrash} className="pe-1" />
                                         Delete
                                     </Dropdown.Item>
+                                    <Dropdown.Item eventKey="3" onClick={handlePauseConnector}>
+                                        <FontAwesomeIcon icon={faPause} className="pe-1" />
+                                        Pause
+                                    </Dropdown.Item>
+                                    <Dropdown.Item eventKey="4" onClick={handleResumeConnector}>
+                                        <FontAwesomeIcon icon={faPlay} className="pe-1" />
+                                        Resume
+                                    </Dropdown.Item>
+                                    <Dropdown.Item eventKey="5" onClick={handleRestartConnector}>
+                                        <FontAwesomeIcon icon={faRotate} className="pe-1" />
+                                        Restart
+                                    </Dropdown.Item>
                                     <Dropdown.Divider />
                                     <Dropdown.Header>KSQL Table</Dropdown.Header>
-                                    <Dropdown.Item eventKey="3" onClick={handleCreateKTable}>
+                                    <Dropdown.Item eventKey="6" onClick={handleCreateKTable}>
                                         <FontAwesomeIcon icon={faPlus} className="pe-1" />
                                         Create
                                     </Dropdown.Item>
-                                    <Dropdown.Item eventKey="4" onClick={() => handleDeleteKTable()}>
+                                    <Dropdown.Item eventKey="7" onClick={() => handleDeleteKTable()}>
                                         <FontAwesomeIcon icon={faTrash} className="pe-1" />
                                         Delete
                                     </Dropdown.Item>
                                     <Dropdown.Divider />
                                     <Dropdown.Header>Connector</Dropdown.Header>
-                                    <Dropdown.Item eventKey="5" onClick={handleCreateConnector}>
+                                    <Dropdown.Item eventKey="8" onClick={handleCreateConnector}>
                                         <FontAwesomeIcon icon={faPlus} className="pe-1" />
                                         Create
                                     </Dropdown.Item>
-                                    <Dropdown.Item eventKey="6" onClick={() => handleDeleteConnector()}>
+                                    <Dropdown.Item eventKey="9" onClick={() => handleDeleteConnector()}>
                                         <FontAwesomeIcon icon={faTrash} className="pe-1" />
                                         Delete
                                     </Dropdown.Item>

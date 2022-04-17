@@ -54,6 +54,18 @@ export async function deleteSourceConnector() {
     return await runConnector(() => replica_api.delete('/v1/cluster/src/connector/'))
 }
 
+export async function pauseSourceConnector() {
+    return await runConnector(() => replica_api.put('/v1/cluster/src/connectors/pause/'))
+}
+
+export async function resumeSourceConnector() {
+    return await runConnector(() => replica_api.put('/v1/cluster/src/connectors/resume/'))
+}
+
+export async function restartSourceConnector() {
+    return await runConnector(() => replica_api.put('/v1/cluster/src/connectors/restart/'))
+}
+
 // Sink //////////////////////////////////////
 // KSQL Table
 export async function createSinkKTable(dbHostname: string, dbName: string, 
@@ -88,6 +100,27 @@ export async function deleteSinkConnector(dbHostname: string, dbName: string,
     dbTable: string) {
     return await runConnector(() => replica_api.delete('/v1/cluster/snk/connectors/',{
         data: { db_hostname: dbHostname, db_name: dbName, db_table: dbTable }
+    }))
+}
+
+export async function pauseSinkConnector(dbHostname: string, dbName: string, 
+    dbTable: string) {
+    return await runConnector(() => replica_api.put('/v1/cluster/snk/connectors/pause/',{
+        db_hostname: dbHostname, db_name: dbName, db_table: dbTable
+    }))
+}
+
+export async function resumeSinkConnector(dbHostname: string, dbName: string, 
+    dbTable: string) {
+    return await runConnector(() => replica_api.put('/v1/cluster/snk/connectors/resume/',{
+        db_hostname: dbHostname, db_name: dbName, db_table: dbTable
+    }))
+}
+
+export async function restartSinkConnector(dbHostname: string, dbName: string, 
+    dbTable: string) {
+    return await runConnector(() => replica_api.put('/v1/cluster/snk/connectors/restart/',{
+        db_hostname: dbHostname, db_name: dbName, db_table: dbTable
     }))
 }
 

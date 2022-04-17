@@ -1,10 +1,11 @@
 from asyncio.log import logger
 from asgiref.sync import sync_to_async
+from datetime import datetime
 import logging
 import json
 from typing import List
 from requests import Response
-import sqlalchemy as db
+import sqlalchemy as orm
 from sqlalchemy.future import select
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,8 +24,8 @@ class AccountChange(Base):
     """A database table containing entries tracking account record changes."""
     __tablename__ = "account_change"
 
-    id = db.Column('change_id', db.Integer, primary_key=True)
-    account_id = db.Column(db.Integer, db.ForeignKey("account.acct_id"))
+    id = orm.Column('change_id', orm.Integer, primary_key=True)
+    account_id = orm.Column(orm.Integer, orm.ForeignKey("account.acct_id"))
     account = relationship("Account")
 
 
@@ -32,12 +33,12 @@ class Account(Base):
     """A database table containing account information."""
     __tablename__ = "account"
 
-    id = db.Column('acct_id', db.Integer, primary_key=True)
-    name = db.Column(db.Text(length=200))
-    last_change_id = db.Column(db.Integer)
-    last_modified = db.Column(db.DateTime,
-        server_default=db.func.now(),
-        server_onupdate=db.func.now())
+    id = orm.Column('acct_id', orm.Integer, primary_key=True)
+    name = orm.Column(orm.Text(length=200))
+    last_change_id = orm.Column(orm.Integer)
+    last_modified = orm.Column(orm.DateTime,
+        server_default=orm.func.now(),
+        server_onupdate=orm.func.now())
 
 
 # Validators
@@ -108,6 +109,7 @@ def update_account(db: AsyncSession, acct_id: int, **acct_data: dict) \
         db.flush()
         
         acct.last_change_id = account_change.id
+        acct.last_modified = datetime.utcnow()
         db.commit()
 
     return acct
@@ -116,7 +118,7 @@ def update_account(db: AsyncSession, acct_id: int, **acct_data: dict) \
 @sync_to_async
 def list_accounts(db: AsyncSession) -> List[Account]:
     """List all accounts."""
-    return [acct for acct in db.scalars(select(Account))]
+    return [acct for acct in db.scalars(select(Account).order_by(orm.asc(Account.id)))]
 
 
 @sync_to_async

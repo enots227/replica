@@ -146,3 +146,36 @@ async def delete_connector(
     """
     return await kafka.connect.delete_connector('replica_src')
 
+
+async def pause_connector(
+    kafka: KafkaAPI,
+) -> Response:
+    """Pause the database source connector.
+
+    Returns:
+        Response from the Kafka connect API.
+    """
+    return await kafka.connect.pause_connector('replica_src')
+
+
+async def resume_connector(
+    kafka: KafkaAPI,
+) -> Response:
+    """Resume the database sink connector.
+
+    Returns:
+        Response from the Kafka connect API.
+    """
+    return await kafka.connect.resume_connector('replica_src')
+
+
+async def restart_connector(
+    kafka: KafkaAPI,
+) -> Response:
+    """Restart the database sink connector.
+
+    Returns:
+        Response from the Kafka connect API.
+    """
+    return await kafka.connect.restart_connector('replica_src')
+

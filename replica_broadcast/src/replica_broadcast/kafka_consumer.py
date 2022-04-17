@@ -71,10 +71,9 @@ def consume_loop(consumer, topics):
         while True:
             try:
                 msg: Message = consumer.poll(timeout=1.0)
-            except ValueDeserializationError as err:
+            except ValueDeserializationError:
                 logger.warning("Message deserialization failed", extra={
-                    'msg': msg,
-                    'error': err })
+                    'kafka_msg': msg })
                 continue
 
             if msg is None:
@@ -102,18 +101,21 @@ def consume_loop(consumer, topics):
                         last_modified = value['updatedOn'].isoformat()
 
                     async_to_sync(channel_layer.group_send)(
-                        F"chat_{msg.key()}",
+                        F"acct_{msg.key()}",
                         {
-                            'type': 'chat_message',
+                            'type': 'acct_message',
                             'label': value['label'],
                             'outcome': value['outcome'],
                             'version': value['version'],
                             'updatedOn': last_modified,
                         }
                     )
-                except TypeError as err:
+                except TypeError:
                     logger.error('broadcast group does not exist, not '
                         'broadcasting', extra={ 'acct_id': msg.key() })
+    except Exception:
+        logger.fatal('Kafka consumer loop exiting unexpectedly!!', 
+            exc_info=True)
     finally:
         # Close down consumer to commit final offsets.
         consumer.close()

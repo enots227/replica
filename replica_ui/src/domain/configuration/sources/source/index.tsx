@@ -1,14 +1,14 @@
-import React, { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Form, Button, Col, Row, ButtonGroup, Spinner, Dropdown, DropdownButton } from 'react-bootstrap'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faPause, faPlay, faPlus, faTrash, faRotate } from '@fortawesome/free-solid-svg-icons'
 import axios, { AxiosError } from 'axios'
 import RawErrorResponse from '../../../../components/debug/rawErrorResponse'
 import { useNotifier, SuccessNotification, DangerNotification, WarnNotification } from '../../../../components/notifications'
 import { AlreadyExistsError, AlreadyNotExistsError, NeedToDrop, NotPrepared } from '../../../../components/kafka/errors'
 import { parseIntSafe } from '../../../../services/utils/parser'
-import { createSourceSchema, createSourceKTable, deleteSourceKTable, createSourceConnector, deleteSourceConnector } from '../../../../services/api'
+import { createSourceSchema, createSourceKTable, deleteSourceKTable, createSourceConnector, deleteSourceConnector, pauseSourceConnector, resumeSourceConnector, restartSourceConnector } from '../../../../services/api'
 import { Source } from '../types'
 
 type Props = {
@@ -18,9 +18,72 @@ type Props = {
 export default function SourcePane(props: Props) {
     const notifier = useNotifier()
     const { nodeID } = useParams()
+    const navigate = useNavigate()
     const [item, setItem] = useState<Source>(props.item)
     const [processing, setProcessing] = useState(false)
     const [errResp, setErrResp] = useState<AxiosError | null>(null)
+
+    function handleCreate() {
+        (async () => {
+            try {
+                setProcessing(true)
+                setErrResp(null)
+
+                let ktableAlreadyExists = false, connectorAlreadyExists = false
+
+                try {
+                    await createSourceSchema()
+                } catch (err) {
+                    throw err
+                }
+
+                try {
+                    await createSourceKTable()
+                } catch (err) {
+                    if (err instanceof AlreadyExistsError) {
+                        ktableAlreadyExists = true
+                    } else {
+                        throw err
+                    }
+                }
+
+                try {
+                    await createSourceConnector(item.dbHostname, item.dbPort, item.dbName, item.dbUser, item.dbPassword, item.pollInterval)
+                } catch (err) {
+                    if (err instanceof AlreadyExistsError) {
+                        connectorAlreadyExists = true
+                    } else {
+                        throw err
+                    }
+                }
+                
+                notifier.pushNotification(<SuccessNotification title={'Successfully Created Source'}>
+                    {(() => {
+                        if (ktableAlreadyExists && connectorAlreadyExists) {
+                            return 'The source KSQL table and connector already exists.'
+                        } else if (ktableAlreadyExists) {
+                            return 'The source KSQL table already exists and connector was created.'
+                        } else if (connectorAlreadyExists) {
+                            return 'The source KSQL table was created and connector already exists.'
+                        } else {
+                            return 'The source KSQL table and connector was created.'
+                        }
+                    })()}
+                </SuccessNotification>)
+
+                navigate('/configuration/KC_SRC/replica_src')
+                
+                setProcessing(false)
+            } catch (err) {
+                notifier.pushNotification(<DangerNotification title='Failure Creating Sink'>Unexpected error occurred while creating sink.</DangerNotification>)
+
+                if (axios.isAxiosError(err))
+                    setErrResp(err)
+
+                setProcessing(false)
+            }
+        })()
+    }
 
     function handleCreateSchema() {
         (async () => {
@@ -147,6 +210,66 @@ export default function SourcePane(props: Props) {
         })()
     }
 
+    function handlePauseConnector() {
+        (async () => {
+            try {
+                setProcessing(true)
+                setErrResp(null)
+
+                await pauseSourceConnector()
+
+                notifier.pushNotification(<SuccessNotification title='Successfully Paused Connector'>The source connector was paused.</SuccessNotification>)
+            } catch (err) {
+                notifier.pushNotification(<DangerNotification title='Failure Pausing Connector'>Unexpected error occurred while attempting to pause the source connector.</DangerNotification>)
+
+                if (axios.isAxiosError(err))
+                    setErrResp(err)
+            } finally {
+                setProcessing(false)
+            }
+        })()
+    }
+
+    function handleResumeConnector() {
+        (async () => {
+            try {
+                setProcessing(true)
+                setErrResp(null)
+
+                await resumeSourceConnector()
+
+                notifier.pushNotification(<SuccessNotification title='Successfully Resumed Connector'>The source connector was resumed.</SuccessNotification>)
+            } catch (err) {
+                notifier.pushNotification(<DangerNotification title='Failure Resuming Connector'>Unexpected error occurred while attempting to resume the source connector.</DangerNotification>)
+
+                if (axios.isAxiosError(err))
+                    setErrResp(err)
+            } finally {
+                setProcessing(false)
+            }
+        })()
+    }
+
+    function handleRestartConnector() {
+        (async () => {
+            try {
+                setProcessing(true)
+                setErrResp(null)
+
+                await restartSourceConnector()
+
+                notifier.pushNotification(<SuccessNotification title='Successfully Restarted Connector'>The source connector was restarted.</SuccessNotification>)
+            } catch (err) {
+                notifier.pushNotification(<DangerNotification title='Failure Restarting Connector'>Unexpected error occurred while attempting to restart the source connector.</DangerNotification>)
+
+                if (axios.isAxiosError(err))
+                    setErrResp(err)
+            } finally {
+                setProcessing(false)
+            }
+        })()
+    }
+
     const isNew = nodeID === 'new'
 
     return <Form>
@@ -205,6 +328,23 @@ export default function SourcePane(props: Props) {
                         </Button>
                     }
                     <DropdownButton as={ButtonGroup} title="" variant="outline-secondary" disabled={processing}>
+                        <Dropdown.Item eventKey="1" onClick={handleCreate}>
+                            <FontAwesomeIcon icon={faPlus} className="pe-1" />
+                            Create
+                        </Dropdown.Item>
+                        <Dropdown.Item eventKey="3" onClick={handlePauseConnector}>
+                            <FontAwesomeIcon icon={faPause} className="pe-1" />
+                            Pause
+                        </Dropdown.Item>
+                        <Dropdown.Item eventKey="4" onClick={handleResumeConnector}>
+                            <FontAwesomeIcon icon={faPlay} className="pe-1" />
+                            Resume
+                        </Dropdown.Item>
+                        <Dropdown.Item eventKey="5" onClick={handleRestartConnector}>
+                            <FontAwesomeIcon icon={faRotate} className="pe-1" />
+                            Restart
+                        </Dropdown.Item>
+                        <Dropdown.Divider />
                         <Dropdown.Header>Schema</Dropdown.Header>
                         <Dropdown.Item eventKey="1" onClick={handleCreateSchema}>
                             <FontAwesomeIcon icon={faPlus} className="pe-1" />
@@ -212,21 +352,21 @@ export default function SourcePane(props: Props) {
                         </Dropdown.Item>
                         <Dropdown.Divider />
                         <Dropdown.Header>KSQL Table</Dropdown.Header>
-                        <Dropdown.Item eventKey="2" onClick={handleCreateKTable}>
+                        <Dropdown.Item eventKey="6" onClick={handleCreateKTable}>
                             <FontAwesomeIcon icon={faPlus} className="pe-1" />
                             Create
                         </Dropdown.Item>
-                        <Dropdown.Item eventKey="3" onClick={handleDeleteKTable}>
+                        <Dropdown.Item eventKey="7" onClick={handleDeleteKTable}>
                             <FontAwesomeIcon icon={faTrash} className="pe-1" />
                             Delete
                         </Dropdown.Item>
                         <Dropdown.Divider />
                         <Dropdown.Header>Connector</Dropdown.Header>
-                        <Dropdown.Item eventKey="4" onClick={handleCreateConnector}>
+                        <Dropdown.Item eventKey="8" onClick={handleCreateConnector}>
                             <FontAwesomeIcon icon={faPlus} className="pe-1" />
                             Create
                         </Dropdown.Item>
-                        <Dropdown.Item eventKey="5" onClick={handleDeleteConnector}>
+                        <Dropdown.Item eventKey="9" onClick={handleDeleteConnector}>
                             <FontAwesomeIcon icon={faTrash} className="pe-1" />
                             Delete
                         </Dropdown.Item>

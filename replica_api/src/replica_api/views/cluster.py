@@ -62,6 +62,33 @@ class SourceConnector(AsyncView):
         return json_bytes(resp.content, status=resp.status_code)
 
 
+class SourceConnectorPause(AsyncView):
+    """Handle pausing the source connector."""
+
+    async def put(self, request: HttpRequest) -> HttpResponse:
+        resp = await sources.pause_connector(settings.KAFKA_API)
+        
+        return json_bytes(resp.content, status=resp.status_code)
+
+
+class SourceConnectorResume(AsyncView):
+    """Handle resuming the source connector."""
+
+    async def put(self, request: HttpRequest) -> HttpResponse:
+        resp = await sources.resume_connector(settings.KAFKA_API)
+        
+        return json_bytes(resp.content, status=resp.status_code)
+
+
+class SourceConnectorRestart(AsyncView):
+    """Handle restarting the sink connector."""
+
+    async def put(self, request: HttpRequest) -> HttpResponse:
+        resp = await sources.restart_connector(settings.KAFKA_API)
+        
+        return json_bytes(resp.content, status=resp.status_code)
+
+
 # Sink #############
 class SinkKTables(AsyncView):
     """Handle configuring the source connector and source ktable."""
@@ -82,7 +109,7 @@ class SinkKTables(AsyncView):
 
 
 class SinkConnectors(AsyncView):
-    """Handle configuring the source connector and source ktable."""
+    """Handle configuring the sink connector and sink ktable."""
 
     async def post(self, request: HttpRequest) -> HttpResponse:
         data = json_deserialize(request.body)
@@ -95,6 +122,39 @@ class SinkConnectors(AsyncView):
         data = json_deserialize(request.body)
 
         resp = await sinks.delete_connector(settings.KAFKA_API, **data)
+        
+        return json_bytes(resp.content, status=resp.status_code)
+
+
+class SinkConnectorPause(AsyncView):
+    """Handle pausing the sink connector."""
+
+    async def put(self, request: HttpRequest) -> HttpResponse:
+        data = json_deserialize(request.body)
+
+        resp = await sinks.pause_connector(settings.KAFKA_API, **data)
+        
+        return json_bytes(resp.content, status=resp.status_code)
+
+
+class SinkConnectorResume(AsyncView):
+    """Handle resuming the sink connector."""
+
+    async def put(self, request: HttpRequest) -> HttpResponse:
+        data = json_deserialize(request.body)
+
+        resp = await sinks.resume_connector(settings.KAFKA_API, **data)
+        
+        return json_bytes(resp.content, status=resp.status_code)
+
+
+class SinkConnectorRestart(AsyncView):
+    """Handle restarting the sink connector."""
+
+    async def put(self, request: HttpRequest) -> HttpResponse:
+        data = json_deserialize(request.body)
+
+        resp = await sinks.restart_connector(settings.KAFKA_API, **data)
         
         return json_bytes(resp.content, status=resp.status_code)
 
@@ -134,8 +194,14 @@ v1 = [
     path('src/schema-registry/', SourceSchemaRegistry.as_view()),
     path('src/ktable/', SourceKTable.as_view()),
     path('src/connector/', SourceConnector.as_view()),
+    path('src/connectors/pause/', SourceConnectorPause.as_view()),
+    path('src/connectors/resume/', SourceConnectorResume.as_view()),
+    path('src/connectors/restart/', SourceConnectorRestart.as_view()),
     path('snk/ktables/', SinkKTables.as_view()),
     path('snk/connectors/', SinkConnectors.as_view()),
+    path('snk/connectors/pause/', SinkConnectorPause.as_view()),
+    path('snk/connectors/resume/', SinkConnectorResume.as_view()),
+    path('snk/connectors/restart/', SinkConnectorRestart.as_view()),
     path('trg/ktable/', TargetKTable.as_view()),
     path('trg/ktable-queryable/', TargetKTableQueryable.as_view()),
 ]

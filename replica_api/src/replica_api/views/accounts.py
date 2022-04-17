@@ -53,6 +53,10 @@ class Accts(AsyncView):
             'accounts': [{
                 'id': acct.id,
                 'name': acct.name,
+                'lastChange': {
+                    'id': acct.last_change_id,
+                    'on': f'{acct.last_modified}Z',
+                },
             } for acct in accts]
         })
 
@@ -80,6 +84,10 @@ class Acct(AsyncView):
             'account': {
                 'id': acct.id,
                 'name': acct.name,
+                'lastChange': {
+                    'id': acct.last_change_id,
+                    'on': F'{acct.last_modified}Z',
+                },
             },
             "targets": trgs,
         })
@@ -108,6 +116,7 @@ class Acct(AsyncView):
             },
             "change": {
                 'id': acct.last_change_id,
+                'on': f'{acct.last_modified}Z',
             },
         })
 

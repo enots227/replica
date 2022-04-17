@@ -212,8 +212,9 @@ services:
     environment:
       SECRET_KEY: AYMhWZTrfRcLrIFcCbsRe8E9dgy@llC*n4YGd%Gsz5gdcSE4DShnTQM2msYUMv
       ALLOWED_HOSTS: localhost
-      CORS_ALLOWED_ORIGINS: http://localhost:3000
-
+      CORS_ALLOWED_ORIGINS: http://localhost:8002
+      DEBUG: True
+      
       DB_USERNAME: db_user
       DB_PASSWORD: db_password
       DB_HOST: postgres1

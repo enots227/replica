@@ -44,7 +44,8 @@ async def delete_ktable(
     Returns:
         Response from the KSQL API.
     """
-    return await kafka.ksql.execute(F'DROP TABLE "replica_snk_{db_hostname}_{db_name}_{db_table}";')
+    return await kafka.ksql.execute(F'DROP TABLE "replica_snk_{db_hostname}_' +
+        F'{db_name}_{db_table}";')
 
 
 # Connect
@@ -115,5 +116,65 @@ async def delete_connector(
         Response from the Kafka connect API.
     """
     return await kafka.connect.delete_connector(
+        F'replica_snk_{db_hostname}_{db_name}_{db_table}')
+
+
+async def pause_connector(
+    kafka: KafkaAPI,
+    db_hostname: str,
+    db_name: str,
+    db_table: str,
+) -> Response:
+    """Pause the database sink connector.
+
+    Args:
+        db_hostname: The sink database hostname.
+        db_name: The sink database name.
+        db_table: The sink database table.
+
+    Returns:
+        Response from the Kafka connect API.
+    """
+    return await kafka.connect.pause_connector(
+        F'replica_snk_{db_hostname}_{db_name}_{db_table}')
+
+
+async def resume_connector(
+    kafka: KafkaAPI,
+    db_hostname: str,
+    db_name: str,
+    db_table: str,
+) -> Response:
+    """Resume the database sink connector.
+
+    Args:
+        db_hostname: The sink database hostname.
+        db_name: The sink database name.
+        db_table: The sink database table.
+
+    Returns:
+        Response from the Kafka connect API.
+    """
+    return await kafka.connect.resume_connector(
+        F'replica_snk_{db_hostname}_{db_name}_{db_table}')
+
+
+async def restart_connector(
+    kafka: KafkaAPI,
+    db_hostname: str,
+    db_name: str,
+    db_table: str,
+) -> Response:
+    """Restart the database sink connector.
+
+    Args:
+        db_hostname: The sink database hostname.
+        db_name: The sink database name.
+        db_table: The sink database table.
+
+    Returns:
+        Response from the Kafka connect API.
+    """
+    return await kafka.connect.restart_connector(
         F'replica_snk_{db_hostname}_{db_name}_{db_table}')
 
